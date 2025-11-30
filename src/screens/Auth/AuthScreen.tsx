@@ -1,165 +1,278 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    Dimensions,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import AppText from '../../components/common/AppText';
-import AppButton from '../../components/common/AppButton';
-import { Input } from '../../components/common/Input';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/spacing';
-import { DarkColors, LightColors } from '../../theme/colors';
-import Screen from '../../components/common/Screen';
+import { AuthService } from '../../services/auth.service';
+import { useAlert } from '../../context/AlertContext';
+import { handleError } from '../../utils/errorHandler';
+
+const { width } = Dimensions.get('window');
+
+// Define navigation type to fix TypeScript errors
+type AuthScreenNavigationProp = {
+    reset: (config: {
+        index: number;
+        routes: Array<{ name: string }>;
+    }) => void;
+};
 
 export default function AuthScreen() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<AuthScreenNavigationProp>();
     const [isSignUp, setIsSignUp] = useState(true);
     const { theme } = useTheme();
+    const { showAlert } = useAlert();
 
-    const handleGoBack = () => {
-        if (navigation.canGoBack()) {
-            navigation.goBack();
-        } else {
-            // Fallback if no history
-            console.log("No history to go back to");
+    // Form state
+    const [formData, setFormData] = useState({
+        fullName: '',
+        email: '',
+        password: ''
+    });
+
+    const handleInputChange = (field: string, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const handleAuthAction = async () => {
+        // Basic validation
+        if (!formData.email || !formData.password) {
+            showAlert({
+                title: 'Error',
+                message: 'Please fill in all required fields',
+                type: 'error'
+            });
+            return;
+        }
+
+        if (isSignUp && !formData.fullName) {
+            showAlert({
+                title: 'Error',
+                message: 'Please enter your full name',
+                type: 'error'
+            });
+            return;
+        }
+
+        try {
+            if (isSignUp) {
+                const { data, error } = await AuthService.signUp(formData.email, formData.password, formData.fullName);
+                if (error) {
+                    const { title, message } = handleError(error);
+                    showAlert({ title, message, type: 'error' });
+                    return;
+                }
+
+                // If user created but no session, try to sign in immediately
+                if (data.user && !data.session) {
+                    const { data: signInData, error: signInError } = await AuthService.signIn(formData.email, formData.password);
+
+                    if (signInError || !signInData.session) {
+                        showAlert({
+                            title: 'Success',
+                            message: 'Account created! Please check your email to verify your account.',
+                            type: 'success'
+                        });
+                        setIsSignUp(false);
+                        return;
+                    }
+                }
+            } else {
+                const { error } = await AuthService.signIn(formData.email, formData.password);
+                if (error) {
+                    const { title, message } = handleError(error);
+                    showAlert({ title, message, type: 'error' });
+                    return;
+                }
+            }
+
+            // Navigate to Main tabs on success
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+            });
+
+        } catch (e) {
+            const { title, message } = handleError(e);
+            showAlert({ title, message, type: 'error' });
+            console.error(e);
         }
     };
 
-    const handleAuthAction = () => {
-        // Navigate to Main tabs
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Main' as never }],
+    const handleSocialLogin = (provider: string) => {
+        console.log(`Social login with: ${provider}`);
+        showAlert({
+            title: 'Coming Soon',
+            message: `${provider} login is not yet implemented.`,
+            type: 'info'
         });
     };
 
     return (
-        <Screen>
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={handleGoBack}
-                        style={styles.backButton}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        <LinearGradient
+            colors={[theme.colors.prussianBlue, '#0A1128']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.container}
+        >
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    style={styles.keyboardAvoidingView}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
                     >
-                        <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <AppText style={[styles.headerTitle, { color: theme.colors.primary }]}>
-                        Join Personal Finance Tracker
-                    </AppText>
-                </View>
+                        {/* Header / Logo */}
+                        <Animated.View entering={FadeInDown.duration(800).springify()} style={styles.header}>
+                            <View style={styles.logoContainer}>
+                                <Ionicons name="wallet" size={48} color={theme.colors.primary} />
+                            </View>
+                            <AppText style={styles.appName}>Finance Tracker</AppText>
+                            <AppText style={styles.tagline}>Master your money, master your life.</AppText>
+                        </Animated.View>
 
-                {/* Toggle Sign Up / Log In */}
-                <View style={[styles.toggleContainer, { backgroundColor: theme.colors.card }]}>
-                    <TouchableOpacity
-                        style={[
-                            styles.toggleButton,
-                            isSignUp && {
-                                backgroundColor: theme.colors.primary,
-                                shadowColor: theme.colors.text
-                            }
-                        ]}
-                        onPress={() => setIsSignUp(true)}
-                    >
-                        <AppText style={[
-                            styles.toggleText,
-                            { color: isSignUp ? theme.colors.white : theme.colors.textSecondary }
-                        ]}>
-                            Sign Up
-                        </AppText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.toggleButton,
-                            !isSignUp && {
-                                backgroundColor: theme.colors.primary,
-                                shadowColor: theme.colors.text
-                            }
-                        ]}
-                        onPress={() => setIsSignUp(false)}
-                    >
-                        <AppText style={[
-                            styles.toggleText,
-                            { color: !isSignUp ? theme.colors.white : theme.colors.textSecondary }
-                        ]}>
-                            Log In
-                        </AppText>
-                    </TouchableOpacity>
-                </View>
+                        {/* Auth Card */}
+                        <Animated.View entering={FadeInDown.delay(200).duration(800).springify()} style={styles.authCard}>
+                            {/* Toggle */}
+                            <View style={styles.toggleContainer}>
+                                <TouchableOpacity
+                                    style={[styles.toggleButton, isSignUp && styles.activeToggle]}
+                                    onPress={() => setIsSignUp(true)}
+                                >
+                                    <AppText style={[styles.toggleText, isSignUp ? { color: '#fff' } : { color: 'rgba(255,255,255,0.5)' }]}>
+                                        Sign Up
+                                    </AppText>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.toggleButton, !isSignUp && styles.activeToggle]}
+                                    onPress={() => setIsSignUp(false)}
+                                >
+                                    <AppText style={[styles.toggleText, !isSignUp ? { color: '#fff' } : { color: 'rgba(255,255,255,0.5)' }]}>
+                                        Log In
+                                    </AppText>
+                                </TouchableOpacity>
+                            </View>
 
-                {/* Title & Subtitle */}
-                <View style={styles.titleContainer}>
-                    <AppText style={[styles.title, { color: theme.colors.text }]}>
-                        {isSignUp ? "Create an Account" : "Welcome Back"}
-                    </AppText>
-                    <AppText style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-                        {isSignUp ? "Start your financial journey with us." : "Log in to continue your journey."}
-                    </AppText>
-                </View>
+                            {/* Form */}
+                            <View style={styles.form}>
+                                {isSignUp && (
+                                    <View style={styles.inputGroup}>
+                                        <Ionicons name="person-outline" size={20} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
+                                        <TextInput
+                                            placeholder="Full Name"
+                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            style={styles.input}
+                                            value={formData.fullName}
+                                            onChangeText={(value) => handleInputChange('fullName', value)}
+                                            autoCapitalize="words"
+                                        />
+                                    </View>
+                                )}
+                                <View style={styles.inputGroup}>
+                                    <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
+                                    <TextInput
+                                        placeholder="Email Address"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        style={styles.input}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={formData.email}
+                                        onChangeText={(value) => handleInputChange('email', value)}
+                                        autoComplete="email"
+                                    />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
+                                    <TextInput
+                                        placeholder="Password"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        style={styles.input}
+                                        secureTextEntry
+                                        value={formData.password}
+                                        onChangeText={(value) => handleInputChange('password', value)}
+                                        autoComplete={isSignUp ? "new-password" : "current-password"}
+                                    />
+                                </View>
 
-                {/* Form */}
-                <View style={styles.formContainer}>
-                    {isSignUp && (
-                        <Input
-                            label="Full Name"
-                            placeholder="John Doe"
-                            icon="person-outline"
-                            containerStyle={styles.inputContainer}
-                        />
-                    )}
-                    <Input
-                        label="Email"
-                        placeholder="name@example.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        icon="mail-outline"
-                        containerStyle={styles.inputContainer}
-                    />
-                    <Input
-                        label="Password"
-                        placeholder="********"
-                        secureTextEntry
-                        icon="lock-closed-outline"
-                        containerStyle={styles.inputContainer}
-                    />
+                                <TouchableOpacity
+                                    style={styles.submitButton}
+                                    onPress={handleAuthAction}
+                                    activeOpacity={0.9}
+                                >
+                                    <LinearGradient
+                                        colors={['#FCA311', '#E89200']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.submitButtonGradient}
+                                    >
+                                        <AppText style={styles.submitButtonText}>
+                                            {isSignUp ? 'Create Account' : 'Welcome Back'}
+                                        </AppText>
+                                        <Ionicons name="arrow-forward" size={20} color="#fff" />
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
 
-                    <AppButton
-                        title={isSignUp ? "Sign Up" : "Log In"}
-                        onPress={handleAuthAction}
-                        style={styles.submitButton}
-                    />
-                </View>
+                            {/* Social Login */}
+                            <View style={styles.divider}>
+                                <View style={styles.dividerLine} />
+                                <AppText style={styles.dividerText}>OR CONTINUE WITH</AppText>
+                                <View style={styles.dividerLine} />
+                            </View>
 
-                {/* Divider */}
-                <View style={styles.dividerContainer}>
-                    <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
-                    <AppText style={[styles.dividerText, { color: theme.colors.textMuted }]}>
-                        OR CONTINUE WITH
-                    </AppText>
-                    <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
-                </View>
+                            <View style={styles.socialButtons}>
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={() => handleSocialLogin('google')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-google" size={24} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={() => handleSocialLogin('apple')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-apple" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
 
-                {/* Social Buttons */}
-                <AppButton
-                    title="Continue with Google"
-                    variant="primary"
-                    icon="logo-google"
-                    onPress={handleAuthAction}
-                    style={styles.socialButton}
-                />
-                <AppButton
-                    title="Continue with PhonePe"
-                    variant="primary"
-                    icon="phone-portrait-outline"
-                    onPress={handleAuthAction}
-                    style={styles.socialButton}
-                />
-            </ScrollView>
-        </Screen>
+                        {/* Footer */}
+                        <Animated.View entering={FadeInUp.delay(400).duration(800).springify()} style={styles.footer}>
+                            <AppText style={styles.footerText}>
+                                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+                            </AppText>
+                            <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)}>
+                                <AppText style={styles.footerLink}>
+                                    {isSignUp ? ' Log In' : ' Sign Up'}
+                                </AppText>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </LinearGradient>
     );
 }
 
@@ -167,85 +280,157 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    safeArea: {
+        flex: 1,
+    },
+    keyboardAvoidingView: {
+        flex: 1,
+    },
     scrollContent: {
-        padding: spacing.md,
         flexGrow: 1,
+        justifyContent: 'center',
+        padding: spacing.lg,
     },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.lg,
+        marginBottom: 40,
     },
-    backButton: {
-        marginRight: spacing.sm,
-        padding: spacing.xs,
+    logoContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        flex: 1,
-        marginLeft: spacing.xs,
+    appName: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    tagline: {
+        fontSize: 16,
+        color: 'rgba(255,255,255,0.6)',
+        textAlign: 'center',
+    },
+    authCard: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 30,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        marginBottom: spacing.xl,
     },
     toggleContainer: {
         flexDirection: 'row',
-        borderRadius: spacing.xl,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderRadius: 16,
         padding: 4,
-        marginBottom: spacing.xl,
+        marginBottom: 24,
     },
     toggleButton: {
         flex: 1,
-        paddingVertical: spacing.sm,
+        paddingVertical: 12,
         alignItems: 'center',
-        borderRadius: spacing.xl,
+        borderRadius: 12,
+    },
+    activeToggle: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     toggleText: {
-        fontWeight: '500',
+        fontWeight: '600',
         fontSize: 14,
     },
-    titleContainer: {
-        alignItems: 'center',
-        marginBottom: spacing.xl,
+    form: {
+        gap: 16,
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: spacing.xs,
-        textAlign: 'center',
-    },
-    subtitle: {
-        textAlign: 'center',
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    formContainer: {
-        marginBottom: spacing.lg,
-    },
-    inputContainer: {
-        marginBottom: spacing.md,
-    },
-    submitButton: {
-        marginTop: spacing.sm,
-        borderRadius: spacing.xl,
-        backgroundColor: LightColors.primaryDark
-    },
-    dividerContainer: {
+    inputGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.lg,
-        marginTop: spacing.sm,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        height: 56,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 16,
+        height: '100%',
+    },
+    submitButton: {
+        marginTop: 8,
+        shadowColor: '#FCA311',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    submitButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 16,
+    },
+    submitButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+        marginRight: 8,
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 24,
     },
     dividerLine: {
         flex: 1,
         height: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     dividerText: {
-        marginHorizontal: spacing.md,
+        color: 'rgba(255,255,255,0.4)',
         fontSize: 12,
-        fontWeight: '500',
+        fontWeight: '600',
+        marginHorizontal: 16,
+    },
+    socialButtons: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 20,
     },
     socialButton: {
-        borderRadius: spacing.xl,
-        marginBottom: spacing.sm,
-        backgroundColor: DarkColors.prussianBlue
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    footerText: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+    },
+    footerLink: {
+        color: '#FCA311',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
