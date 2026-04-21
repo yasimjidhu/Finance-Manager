@@ -22,6 +22,7 @@ import { BudgetService, BudgetCategory } from '../../services/budget.service';
 import { formatCurrency } from '../../utils/helpers';
 
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import LoadingOverlay from '../../components/common/LoadingOverlay';
 
 import { useAlert } from '../../context/AlertContext';
 
@@ -41,15 +42,100 @@ const BudgetScreen = ({ navigation }: any) => {
 
     const [isModalVisible, setModalVisible] = useState(false);
     const [isEditBudgetVisible, setEditBudgetVisible] = useState(false);
-    const [newCategory, setNewCategory] = useState({ name: '', allocated: '' });
+    const [newCategory, setNewCategory] = useState({
+        name: '',
+        allocated: '',
+        icon: 'pricetag-outline',
+        color: '#FCA311'
+    });
+    const [editingCategory, setEditingCategory] = useState<any>(null);
     const [newTotalBudget, setNewTotalBudget] = useState('');
+    const [forecast, setForecast] = useState({ projected: 0, status: 'On Track', dailyAverage: 0 });
+
+    const AVAILABLE_ICONS = ['pricetag-outline', 'cart-outline', 'restaurant-outline', 'car-outline', 'home-outline', 'medical-outline', 'school-outline', 'airplane-outline', 'game-controller-outline', 'gift-outline', 'fitness-outline', 'paw-outline'];
+    const AVAILABLE_COLORS = ['#FCA311', '#8B5CF6', '#EC4899', '#10B981', '#3B82F6', '#EF4444', '#6366F1', '#F472B6', '#14B8A6'];
+
+    const [chartData, setChartData] = useState({
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [
+            {
+                data: [0, 0, 0, 0, 0, 0],
+                color: (opacity = 1) => theme.colors.primary,
+                strokeWidth: 3,
+            },
+            {
+                data: [0, 0, 0, 0, 0, 0],
+                color: (opacity = 1) => `rgba(252, 163, 17, ${opacity * 0.5})`,
+                strokeWidth: 2,
+                withDots: false,
+                strokeDashArray: [5, 5],
+            },
+        ],
+        legend: ['Actual', 'Budget Limit'],
+    });
+
+    const processChartData = (transactions: any[], totalBudget: number) => {
+        const months = [];
+        const spendingData = [];
+        const budgetData = [];
+
+        const today = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const monthName = d.toLocaleString('default', { month: 'short' });
+            months.push(monthName);
+
+            // Filter transactions for this month
+            const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+            const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+            const monthlySpent = transactions
+                .filter(t => {
+                    const tDate = new Date(t.date);
+                    return t.type === 'expense' && tDate >= startOfMonth && tDate <= endOfMonth;
+                })
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            spendingData.push(monthlySpent);
+            budgetData.push(totalBudget);
+        }
+
+        setChartData({
+            labels: months,
+            datasets: [
+                {
+                    data: spendingData,
+                    color: (opacity = 1) => theme.colors.primary,
+                    strokeWidth: 3,
+                },
+                {
+                    data: budgetData,
+                    color: (opacity = 1) => `rgba(252, 163, 17, ${opacity * 0.5})`,
+                    strokeWidth: 2,
+                    withDots: false,
+                    strokeDashArray: [5, 5],
+                },
+            ],
+            legend: ['Actual', 'Budget Limit'],
+        });
+    };
 
     const loadData = async () => {
         const data = await BudgetService.getBudgetStatus();
         setBudgetData(data);
         setNewTotalBudget(data.totalBudget.toString());
+
+        // Process chart data
+        const allTransactions = await import('../../services/expense.service').then(m => m.ExpenseService.getAllTransactions());
+        processChartData(allTransactions, data.totalBudget);
+
+        const forecastData = await BudgetService.getForecast();
+        setForecast(forecastData);
+
         setLoading(false);
     };
+
+
 
     useFocusEffect(
         useCallback(() => {
@@ -63,7 +149,7 @@ const BudgetScreen = ({ navigation }: any) => {
         setRefreshing(false);
     };
 
-    const handleAddCategory = async () => {
+    const handleSaveCategory = async () => {
         if (!newCategory.name || !newCategory.allocated) {
             showAlert({
                 title: 'Error',
@@ -73,17 +159,62 @@ const BudgetScreen = ({ navigation }: any) => {
             return;
         }
 
-        await BudgetService.addBudgetCategory({
-            name: newCategory.name,
-            allocated: parseInt(newCategory.allocated),
-            icon: 'pricetag-outline',
-            iconType: 'Ionicons',
-            color: theme.colors.primary // Default color
-        });
+        if (editingCategory) {
+            await BudgetService.updateBudgetCategory(editingCategory.id, {
+                name: newCategory.name,
+                allocated: parseInt(newCategory.allocated),
+                icon: newCategory.icon,
+                iconType: 'Ionicons',
+                color: newCategory.color
+            });
+        } else {
+            await BudgetService.addBudgetCategory({
+                name: newCategory.name,
+                allocated: parseInt(newCategory.allocated),
+                icon: newCategory.icon,
+                iconType: 'Ionicons',
+                color: newCategory.color
+            });
+        }
 
         setModalVisible(false);
-        setNewCategory({ name: '', allocated: '' });
+        setEditingCategory(null);
+        setNewCategory({ name: '', allocated: '', icon: 'pricetag-outline', color: '#FCA311' });
         loadData();
+    };
+
+    const handleEditPress = (category: any) => {
+        setEditingCategory(category);
+        setNewCategory({
+            name: category.name,
+            allocated: category.allocated.toString(),
+            icon: category.icon || 'pricetag-outline',
+            color: category.color || '#FCA311'
+        });
+        setModalVisible(true);
+    };
+
+    const handleDeleteCategory = async () => {
+        if (!editingCategory) return;
+
+        Alert.alert(
+            'Delete Category',
+            `Are you sure you want to delete ${editingCategory.name}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await BudgetService.deleteBudgetCategory(editingCategory.id);
+                        setModalVisible(false);
+                        setEditingCategory(null);
+                        setNewCategory({ name: '', allocated: '', icon: 'pricetag-outline', color: '#FCA311' });
+                        loadData();
+                    }
+                }
+            ]
+        );
     };
 
     const handleUpdateTotalBudget = async () => {
@@ -93,27 +224,6 @@ const BudgetScreen = ({ navigation }: any) => {
         loadData();
     };
 
-    const chartData = {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-        datasets: [
-            {
-                data: [30000, 35000, 40000, 42000, 45000],
-                color: (opacity = 1) => theme.colors.primary,
-                strokeWidth: 3,
-            },
-            {
-                data: [32000, 34000, 38000, 43000, 46000],
-                color: (opacity = 1) => `rgba(252, 163, 17, ${opacity * 0.5})`,
-                strokeWidth: 2,
-                withDots: false,
-                strokeDashArray: [5, 5],
-            },
-        ],
-        legend: ['Actual', 'Forecast'],
-    };
-
-
-
     const renderCategoryItem = (item: any, index: number) => {
         const percentage = item.allocated > 0 ? Math.min((item.spent / item.allocated) * 100, 100) : 0;
         const isOverspent = item.spent > item.allocated;
@@ -121,7 +231,8 @@ const BudgetScreen = ({ navigation }: any) => {
         return (
             <Animated.View key={item.id} entering={FadeInDown.delay(400 + (index * 50)).duration(600).springify()}>
                 <TouchableOpacity
-                    activeOpacity={0.8}
+                    activeOpacity={0.7}
+                    onPress={() => handleEditPress(item)}
                     style={[styles.categoryCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}
                 >
                     <View style={styles.categoryHeader}>
@@ -169,13 +280,21 @@ const BudgetScreen = ({ navigation }: any) => {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+            <LoadingOverlay visible={loading} />
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
                     <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Budget & Forecast</Text>
-                <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => {
+                        setEditingCategory(null);
+                        setNewCategory({ name: '', allocated: '', icon: 'pricetag-outline', color: '#FCA311' });
+                        setModalVisible(true);
+                    }}
+                >
                     <Ionicons name="add" size={24} color={theme.colors.white} />
                 </TouchableOpacity>
             </View>
@@ -212,6 +331,40 @@ const BudgetScreen = ({ navigation }: any) => {
                             <View>
                                 <Text style={styles.footerLabel}>Remaining</Text>
                                 <Text style={[styles.footerValue, { color: theme.colors.primary }]}>{formatCurrency(budgetData.remaining)}</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </Animated.View>
+
+                {/* Forecast Summary Card */}
+                <Animated.View entering={FadeInDown.delay(100).duration(600).springify()}>
+                    <LinearGradient
+                        colors={[theme.colors.card, theme.colors.card]}
+                        style={[styles.forecastCard, { shadowColor: theme.colors.text }]}
+                    >
+                        <View style={styles.forecastHeader}>
+                            <View style={[styles.iconContainer, { backgroundColor: 'rgba(16, 185, 129, 0.1)', width: 40, height: 40 }]}>
+                                <Ionicons name="analytics" size={20} color="#10B981" />
+                            </View>
+                            <View>
+                                <Text style={[styles.forecastTitle, { color: theme.colors.text }]}>End of Month Projection</Text>
+                                <Text style={[styles.forecastSubtitle, { color: theme.colors.textMuted }]}>Based on daily spending of {formatCurrency(forecast.dailyAverage)}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.forecastBody}>
+                            <Text style={[styles.forecastAmount, { color: theme.colors.text }]}>
+                                {formatCurrency(forecast.projected)}
+                            </Text>
+                            <View style={[styles.statusBadge, {
+                                backgroundColor: forecast.status === 'Over Budget' ? 'rgba(239, 68, 68, 0.1)' :
+                                    forecast.status === 'At Risk' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)'
+                            }]}>
+                                <Text style={[styles.statusText, {
+                                    color: forecast.status === 'Over Budget' ? '#EF4444' :
+                                        forecast.status === 'At Risk' ? '#F59E0B' : '#10B981'
+                                }]}>
+                                    {forecast.status}
+                                </Text>
                             </View>
                         </View>
                     </LinearGradient>
@@ -273,9 +426,12 @@ const BudgetScreen = ({ navigation }: any) => {
             <ActionSheet
                 visible={isModalVisible}
                 onClose={() => setModalVisible(false)}
-                title="Add Budget Category"
-                actionLabel="Add Category"
-                onAction={handleAddCategory}
+                title={editingCategory ? "Edit Category" : "Add Budget Category"}
+                actionLabel={editingCategory ? "Save Changes" : "Add Category"}
+                onAction={handleSaveCategory}
+                secondaryActionLabel={editingCategory ? "Delete Category" : undefined}
+                onSecondaryAction={editingCategory ? handleDeleteCategory : undefined}
+                secondaryActionDestructive
             >
                 <View style={styles.inputGroup}>
                     <Text style={[styles.label, { color: theme.colors.text }]}>Category Name</Text>
@@ -297,6 +453,43 @@ const BudgetScreen = ({ navigation }: any) => {
                         value={newCategory.allocated}
                         onChangeText={(text) => setNewCategory({ ...newCategory, allocated: text })}
                     />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Icon</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.iconSelector}>
+                        {AVAILABLE_ICONS.map(icon => (
+                            <TouchableOpacity
+                                key={icon}
+                                style={[
+                                    styles.iconOption,
+                                    newCategory.icon === icon && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                                ]}
+                                onPress={() => setNewCategory({ ...newCategory, icon })}
+                            >
+                                <Ionicons name={icon as any} size={24} color={newCategory.icon === icon ? '#FFF' : theme.colors.textMuted} />
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Color</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorSelector}>
+                        {AVAILABLE_COLORS.map(color => (
+                            <TouchableOpacity
+                                key={color}
+                                style={[
+                                    styles.colorOption,
+                                    { backgroundColor: color },
+                                    newCategory.color === color && styles.selectedColorOption
+                                ]}
+                                onPress={() => setNewCategory({ ...newCategory, color })}
+                            >
+                                {newCategory.color === color && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
             </ActionSheet>
 
@@ -516,6 +709,76 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 16,
+    },
+    forecastCard: {
+        marginHorizontal: spacing.lg,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: spacing.xl,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    forecastHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    forecastTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    forecastSubtitle: {
+        fontSize: 12,
+    },
+    forecastBody: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    forecastAmount: {
+        fontSize: 24,
+        fontWeight: '700',
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    iconSelector: {
+        gap: 12,
+        paddingVertical: 4,
+    },
+    iconOption: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    colorSelector: {
+        gap: 12,
+        paddingVertical: 4,
+    },
+    colorOption: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    selectedColorOption: {
+        borderWidth: 3,
+        borderColor: '#FFF',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
 });
 

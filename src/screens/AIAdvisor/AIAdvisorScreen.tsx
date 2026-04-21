@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeProvider';
 
+import Animated, { FadeInUp, FadeInRight, FadeInLeft } from 'react-native-reanimated';
+
 interface Message {
     id: string;
     text: string;
@@ -87,17 +89,22 @@ const AIAdvisorScreen = ({ navigation }: any) => {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }, [messages]);
 
+
+
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.sender === 'user';
         return (
-            <View style={[
-                styles.messageBubble,
-                isUser ? styles.userBubble : styles.aiBubble,
-                {
-                    backgroundColor: isUser ? theme.colors.primary : (theme.mode === 'dark' ? '#333' : '#E0E7FF'),
-                    alignSelf: isUser ? 'flex-end' : 'flex-start',
-                }
-            ]}>
+            <Animated.View
+                entering={isUser ? FadeInRight.duration(400).springify() : FadeInLeft.duration(400).springify()}
+                style={[
+                    styles.messageBubble,
+                    isUser ? styles.userBubble : styles.aiBubble,
+                    {
+                        backgroundColor: isUser ? theme.colors.primary : (theme.mode === 'dark' ? '#333' : '#E0E7FF'),
+                        alignSelf: isUser ? 'flex-end' : 'flex-start',
+                    }
+                ]}
+            >
                 {!isUser && (
                     <View style={styles.botIcon}>
                         <MaterialCommunityIcons name="robot-happy-outline" size={16} color={theme.colors.primary} />
@@ -109,7 +116,7 @@ const AIAdvisorScreen = ({ navigation }: any) => {
                 ]}>
                     {item.text}
                 </Text>
-            </View>
+            </Animated.View>
         );
     };
 

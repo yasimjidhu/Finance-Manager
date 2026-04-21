@@ -24,6 +24,5 @@ const styles = StyleSheet.create({
 });
 
 export const BudgetingForecastingScreen = () => <BudgetScreen />;
-export const UpiSpendScreen = () => <PlaceholderScreen title="UPI Spend Money" />;
-export const SplitMoneyScreen = () => <PlaceholderScreen title="Split Money" />;
+
 export const DueRemindersScreen = () => <PlaceholderScreen title="Due Reminders" />;

@@ -29,77 +29,65 @@ export default function KuriCard({
 
     const getStatusColor = (status: KuriStatus) => {
         switch (status) {
-            case 'Missed': return theme.colors.danger;
-            case 'Due Soon': return '#F472B6'; // Pinkish
+            case 'Missed': return '#EF4444';
+            case 'Due Soon': return '#F59E0B'; // Orange/Warning
             case 'Pending': return theme.colors.textMuted;
-            case 'Paid': return theme.colors.success;
+            case 'Paid': return '#22C55E';
             default: return theme.colors.textMuted;
         }
     };
 
     const getStatusBg = (status: KuriStatus) => {
         switch (status) {
-            case 'Missed': return theme.colors.danger;
-            case 'Due Soon': return '#F472B6';
-            case 'Pending': return '#E5E7EB'; // Light gray
-            case 'Paid': return theme.colors.success;
-            default: return '#E5E7EB';
+            case 'Missed': return 'rgba(239, 68, 68, 0.1)';
+            case 'Due Soon': return 'rgba(245, 158, 11, 0.1)';
+            case 'Pending': return 'rgba(0,0,0,0.05)';
+            case 'Paid': return 'rgba(34, 197, 94, 0.1)';
+            default: return 'rgba(0,0,0,0.05)';
         }
     };
 
     const statusColor = getStatusColor(status);
     const statusBg = getStatusBg(status);
-    const isFilledBadge = status === 'Missed' || status === 'Due Soon';
 
     return (
         <TouchableOpacity
-            style={[styles.card, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+            style={[styles.card, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}
             onPress={onPress}
             activeOpacity={0.7}
         >
             <View style={styles.header}>
-                <View style={{ flex: 1 }}>
-                    <AppText style={[styles.title, { color: theme.colors.text }]}>{title}</AppText>
+                <View style={styles.iconBox}>
+                    <Ionicons name="people-outline" size={20} color={theme.colors.primary} />
                 </View>
-                <View style={styles.totalValueContainer}>
-                    <AppText style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Total Value:</AppText>
-                    <AppText style={[styles.totalValue, { color: theme.colors.text }]}>{formatCurrency(totalValue)}</AppText>
+                <View style={styles.headerText}>
+                    <AppText style={[styles.title, { color: theme.colors.text }]}>{title}</AppText>
+                    <AppText style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+                        Total: {formatCurrency(totalValue)}
+                    </AppText>
+                </View>
+                <View style={[styles.badge, { backgroundColor: statusBg }]}>
+                    <AppText style={[styles.badgeText, { color: statusColor }]}>
+                        {status}
+                    </AppText>
                 </View>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.detailsRow}>
-                <View style={styles.dateContainer}>
-                    <Ionicons name="calendar-outline" size={20} color={theme.colors.textMuted} style={{ marginRight: 8 }} />
-                    <View>
-                        <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Next Installment</AppText>
+                <View style={styles.infoBlock}>
+                    <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Next Due</AppText>
+                    <View style={styles.valueRow}>
+                        <Ionicons name="calendar-outline" size={14} color={theme.colors.text} style={{ marginRight: 4 }} />
                         <AppText style={[styles.value, { color: theme.colors.text }]}>{nextInstallmentDate}</AppText>
                     </View>
                 </View>
 
-                <View style={styles.amountContainer}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                        <Ionicons name="cash-outline" size={16} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
-                        <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Amount</AppText>
-                    </View>
-                    <AppText style={[styles.amountValue, { color: theme.colors.text }]}>{formatCurrency(installmentAmount)}</AppText>
-                </View>
-            </View>
-
-            <View style={styles.footer}>
-                <View style={[
-                    styles.badge,
-                    {
-                        backgroundColor: isFilledBadge ? statusBg : statusBg,
-                        // For filled badges, we might want white text, for pending we want dark text
-                    }
-                ]}>
-                    <AppText style={[
-                        styles.badgeText,
-                        { color: isFilledBadge ? '#FFFFFF' : theme.colors.textMuted }
-                    ]}>
-                        {status}
+                <View style={[styles.infoBlock, { alignItems: 'flex-end' }]}>
+                    <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Installment</AppText>
+                    <AppText style={[styles.amountValue, { color: theme.colors.primary }]}>
+                        {formatCurrency(installmentAmount)}
                     </AppText>
                 </View>
             </View>
@@ -109,78 +97,75 @@ export default function KuriCard({
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: spacing.md,
-        marginBottom: spacing.md,
-        borderWidth: 1,
+        borderRadius: spacing.lg,
         padding: spacing.md,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowRadius: 8,
+        elevation: 3,
     },
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: spacing.sm,
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    iconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: 'rgba(252, 163, 17, 0.1)', // Orange with opacity
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+    },
+    headerText: {
+        flex: 1,
     },
     title: {
         fontSize: 16,
         fontWeight: 'bold',
-        marginRight: spacing.sm,
-        flexWrap: 'wrap',
+        marginBottom: 2,
     },
-    totalValueContainer: {
-        alignItems: 'flex-end',
-    },
-    totalLabel: {
+    subtitle: {
         fontSize: 12,
     },
-    totalValue: {
-        fontSize: 14,
-        fontWeight: '500',
+    badge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: spacing.sm,
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     divider: {
         height: 1,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: 'rgba(0,0,0,0.05)',
         marginBottom: spacing.md,
-        marginTop: spacing.xs,
     },
     detailsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md,
     },
-    dateContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    amountContainer: {
-        alignItems: 'flex-end',
+    infoBlock: {
+        justifyContent: 'center',
     },
     label: {
         fontSize: 12,
+        marginBottom: 4,
+    },
+    valueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     value: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     amountValue: {
         fontSize: 16,
         fontWeight: 'bold',
     },
-    footer: {
-        alignItems: 'flex-end',
-    },
-    badge: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: 4,
-        borderRadius: spacing.xl,
-    },
-    badgeText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
 });
+

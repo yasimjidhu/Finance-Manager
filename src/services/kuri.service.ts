@@ -1,4 +1,4 @@
-import { StorageService } from './storage.service';
+import { supabase } from '../lib/supabase';
 
 export type KuriStatus = 'Active' | 'Won' | 'Closed' | 'Missed' | 'Pending' | 'Due Soon';
 
@@ -10,86 +10,112 @@ export interface Kuri {
     totalMonths: number;
     monthsPaid: number;
     startDate: string; // ISO string
-    nextInstallmentDate: string; // ISO string or formatted string
+    nextInstallmentDate: string; // ISO string
     status: KuriStatus;
     color: string;
+    user_id?: string;
 }
-
-const KURI_KEY = 'kuri_data';
-
-const DUMMY_KURIS: Kuri[] = [
-    {
-        id: '1',
-        title: 'Friends Kuri - Goa Trip',
-        totalValue: 150000,
-        installmentAmount: 5000,
-        totalMonths: 30,
-        monthsPaid: 12,
-        startDate: new Date(Date.now() - 31536000000).toISOString(),
-        nextInstallmentDate: '28 Oct 2023',
-        status: 'Missed',
-        color: '#EF4444'
-    },
-    {
-        id: '2',
-        title: 'Family Kuri Group',
-        totalValue: 500000,
-        installmentAmount: 10000,
-        totalMonths: 50,
-        monthsPaid: 5,
-        startDate: new Date(Date.now() - 15000000000).toISOString(),
-        nextInstallmentDate: '10 Nov 2023',
-        status: 'Pending',
-        color: '#F59E0B'
-    },
-    {
-        id: '3',
-        title: 'Investment Kuri - Group A',
-        totalValue: 1000000,
-        installmentAmount: 25000,
-        totalMonths: 40,
-        monthsPaid: 20,
-        startDate: new Date(Date.now() - 50000000000).toISOString(),
-        nextInstallmentDate: '15 Nov 2023',
-        status: 'Due Soon',
-        color: '#6366F1'
-    }
-];
 
 export const KuriService = {
     getAllKuris: async (): Promise<Kuri[]> => {
-        const data = await StorageService.getData(KURI_KEY);
-        if (!data) {
-            await StorageService.storeData(KURI_KEY, DUMMY_KURIS);
-            return DUMMY_KURIS;
+        try {
+            const { data, error } = await supabase
+                .from('kuris')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Map DB columns to frontend interface if names differ
+            // Assuming DB columns: name, total_amount, amount_per_month, total_months, start_date, status
+            return data.map((item: any) => ({
+                id: item.id,
+                title: item.name,
+                totalValue: item.total_amount || (item.total_months * item.amount_per_month),
+                installmentAmount: item.amount_per_month,
+                totalMonths: item.total_months,
+                monthsPaid: item.months_paid || 0, // You might need to add this column to DB or calculate it
+                startDate: item.start_date,
+                nextInstallmentDate: item.start_date, // Logic needed to calc next date
+                status: item.status as KuriStatus,
+                color: item.color || '#6366F1'
+            }));
+        } catch (error) {
+            console.error('Error fetching Kuris:', error);
+            return [];
         }
-        return data;
     },
 
-    addKuri: async (kuri: Omit<Kuri, 'id'>): Promise<Kuri[]> => {
-        const currentData = await KuriService.getAllKuris();
-        const newKuri = {
-            ...kuri,
-            id: Date.now().toString(),
-        };
-        const updatedData = [newKuri, ...currentData];
-        await StorageService.storeData(KURI_KEY, updatedData);
-        return updatedData;
+    addKuri: async (kuri: Omit<Kuri, 'id'>): Promise<Kuri | null> => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated');
+
+            const { data, error } = await supabase
+                .from('kuris')
+                .insert([{
+                    user_id: user.id,
+                    name: kuri.title,
+                    total_months: kuri.totalMonths,
+                    amount_per_month: kuri.installmentAmount,
+                    start_date: kuri.startDate,
+                    status: 'Active',
+                    months_paid: 0
+                    // Add extra columns if you created them in DB: color
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            return {
+                id: data.id,
+                title: data.name,
+                totalValue: data.total_amount,
+                installmentAmount: data.amount_per_month,
+                totalMonths: data.total_months,
+                monthsPaid: 0,
+                startDate: data.start_date,
+                nextInstallmentDate: data.start_date,
+                status: 'Active',
+                color: kuri.color
+            };
+        } catch (error) {
+            console.error('Error adding Kuri:', error);
+            throw error;
+        }
     },
 
-    updateKuri: async (updatedKuri: Kuri): Promise<Kuri[]> => {
-        const currentData = await KuriService.getAllKuris();
-        const updatedData = currentData.map(k =>
-            k.id === updatedKuri.id ? updatedKuri : k
-        );
-        await StorageService.storeData(KURI_KEY, updatedData);
-        return updatedData;
+    updateKuri: async (updatedKuri: Kuri): Promise<void> => {
+        try {
+            const { error } = await supabase
+                .from('kuris')
+                .update({
+                    name: updatedKuri.title,
+                    amount_per_month: updatedKuri.installmentAmount,
+                    status: updatedKuri.status,
+                    months_paid: updatedKuri.monthsPaid
+                })
+                .eq('id', updatedKuri.id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating Kuri:', error);
+            throw error;
+        }
     },
 
-    deleteKuri: async (id: string): Promise<Kuri[]> => {
-        const currentData = await KuriService.getAllKuris();
-        const updatedData = currentData.filter(k => k.id !== id);
-        await StorageService.storeData(KURI_KEY, updatedData);
-        return updatedData;
+    deleteKuri: async (id: string): Promise<void> => {
+        try {
+            const { error } = await supabase
+                .from('kuris')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting Kuri:', error);
+            throw error;
+        }
     }
 };

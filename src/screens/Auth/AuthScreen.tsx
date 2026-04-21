@@ -116,13 +116,42 @@ export default function AuthScreen() {
         }
     };
 
-    const handleSocialLogin = (provider: string) => {
-        console.log(`Social login with: ${provider}`);
-        showAlert({
-            title: 'Coming Soon',
-            message: `${provider} login is not yet implemented.`,
-            type: 'info'
-        });
+    const handleSocialLogin = async (provider: string) => {
+        if (provider === 'google') {
+            try {
+                const { data, error } = await AuthService.signInWithGoogle();
+                if (error) {
+                    // Handle cancellation or error
+                    if (error.message !== 'Sign in cancelled' && error.message !== 'Sign in in progress') {
+                        showAlert({
+                            title: 'Google Sign-In Failed',
+                            message: error.message || 'Something went wrong',
+                            type: 'error'
+                        });
+                    }
+                    return;
+                }
+
+                // Success
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }],
+                });
+            } catch (e) {
+                console.error(e);
+                showAlert({
+                    title: 'Error',
+                    message: 'An unexpected error occurred',
+                    type: 'error'
+                });
+            }
+        } else {
+            showAlert({
+                title: 'Coming Soon',
+                message: `${provider} login is not yet implemented.`,
+                type: 'info'
+            });
+        }
     };
 
     return (

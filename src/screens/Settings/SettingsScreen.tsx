@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     StyleSheet,
@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     Switch,
     Alert,
-    Linking
+    Linking,
+    TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { spacing } from '../../theme/spacing';
 import { StorageService } from '../../services/storage.service';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAlert } from '../../context/AlertContext';
+import ActionSheet from '../../components/common/ActionSheet';
+import { DataResetService } from '../../services/dataReset.service';
 
 export default function SettingsScreen({ navigation }: any) {
     const { theme, toggleTheme, isDark } = useTheme();
@@ -26,6 +29,41 @@ export default function SettingsScreen({ navigation }: any) {
     const [emailAlerts, setEmailAlerts] = useState(false);
     const [biometricsEnabled, setBiometricsEnabled] = useState(false);
 
+    // Salary Day State
+    const [salaryDay, setSalaryDay] = useState<string>('');
+    const [isSalaryModalVisible, setSalaryModalVisible] = useState(false);
+    const [tempSalaryDay, setTempSalaryDay] = useState('');
+
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        const day = await StorageService.getData('SALARY_DAY');
+        if (day) setSalaryDay(day);
+    };
+
+    const handleSaveSalaryDay = async () => {
+        const day = parseInt(tempSalaryDay);
+        if (isNaN(day) || day < 1 || day > 31) {
+            showAlert({
+                title: "Invalid Day",
+                message: "Please enter a valid day between 1 and 31.",
+                type: "error"
+            });
+            return;
+        }
+
+        await StorageService.storeData('SALARY_DAY', tempSalaryDay);
+        setSalaryDay(tempSalaryDay);
+        setSalaryModalVisible(false);
+        showAlert({
+            title: "Success",
+            message: `Salary day set to day ${tempSalaryDay} of every month.`,
+            type: "success"
+        });
+    };
+
     const handleResetApp = () => {
         showAlert({
             title: "Reset Application",
@@ -34,12 +72,20 @@ export default function SettingsScreen({ navigation }: any) {
             showCancel: true,
             confirmText: "Reset",
             onConfirm: async () => {
-                await StorageService.clearAll();
-                showAlert({
-                    title: "Success",
-                    message: "App data has been reset. Please restart the app.",
-                    type: "success"
-                });
+                try {
+                    await DataResetService.resetAllData();
+                    showAlert({
+                        title: "Success",
+                        message: "App data has been reset. Please restart the app.",
+                        type: "success"
+                    });
+                } catch (error) {
+                    showAlert({
+                        title: "Error",
+                        message: "Failed to reset some data. Please try again.",
+                        type: "error"
+                    });
+                }
             }
         });
     };
@@ -114,6 +160,17 @@ export default function SettingsScreen({ navigation }: any) {
                             value={isDark}
                             onPress={toggleTheme}
                             color="#8B5CF6"
+                        />
+                        <SettingItem
+                            icon="calendar-outline"
+                            label="Salary Day"
+                            type="value"
+                            value={salaryDay ? `Day ${salaryDay}` : "Not Set"}
+                            onPress={() => {
+                                setTempSalaryDay(salaryDay);
+                                setSalaryModalVisible(true);
+                            }}
+                            color="#10B981"
                         />
                         <SettingItem
                             icon="cash-outline"
@@ -231,6 +288,35 @@ export default function SettingsScreen({ navigation }: any) {
                     </AppText>
                 </View>
             </ScrollView>
+
+            {/* Salary Day Modal */}
+            <ActionSheet
+                visible={isSalaryModalVisible}
+                onClose={() => setSalaryModalVisible(false)}
+                title="Set Salary Day"
+                actionLabel="Save"
+                onAction={handleSaveSalaryDay}
+            >
+                <View style={styles.modalContent}>
+                    <AppText style={[styles.modalLabel, { color: theme.colors.textMuted }]}>
+                        Enter the day of the month you receive your salary (1-31):
+                    </AppText>
+                    <TextInput
+                        style={[styles.input, {
+                            color: theme.colors.text,
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.border
+                        }]}
+                        placeholder="e.g. 1"
+                        placeholderTextColor={theme.colors.textMuted}
+                        keyboardType="numeric"
+                        value={tempSalaryDay}
+                        onChangeText={setTempSalaryDay}
+                        maxLength={2}
+                        autoFocus
+                    />
+                </View>
+            </ActionSheet>
         </SafeAreaView>
     );
 }
@@ -301,5 +387,22 @@ const styles = StyleSheet.create({
     },
     copyrightText: {
         fontSize: 12,
+    },
+    modalContent: {
+        paddingVertical: spacing.md,
+        width: '100%',
+    },
+    modalLabel: {
+        fontSize: 14,
+        marginBottom: spacing.md,
+    },
+    input: {
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: spacing.md,
+        fontSize: 16,
+        textAlign: 'center',
+        fontWeight: '600',
     },
 });

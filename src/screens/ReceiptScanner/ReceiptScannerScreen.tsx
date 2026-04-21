@@ -54,21 +54,24 @@ export default function ReceiptScannerScreen() {
         try {
             const data = await ReceiptScannerService.analyzeReceipt(imageUri);
             setReceiptData(data);
-        } catch (error) {
-            Alert.alert("Error", "Failed to analyze receipt. Please try again.");
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "Failed to analyze receipt. Please try again.");
         } finally {
             setIsScanning(false);
         }
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
     const handleSave = async () => {
         if (!receiptData) return;
 
+        setIsSaving(true);
         try {
             await ExpenseService.addTransaction({
                 title: receiptData.merchantName,
                 amount: receiptData.totalAmount,
-                date: new Date().toISOString(), // Use current time for simplicity or parse receiptData.date
+                date: new Date().toISOString(),
                 type: 'expense',
                 category: 'Shopping',
                 icon: 'receipt',
@@ -80,6 +83,8 @@ export default function ReceiptScannerScreen() {
             ]);
         } catch (error) {
             Alert.alert("Error", "Failed to save expense.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -175,8 +180,13 @@ export default function ReceiptScannerScreen() {
                             <TouchableOpacity
                                 style={[styles.primaryButton, { backgroundColor: theme.colors.success }]}
                                 onPress={handleSave}
+                                disabled={isSaving}
                             >
-                                <AppText style={{ color: '#fff', fontWeight: 'bold' }}>Save Expense</AppText>
+                                {isSaving ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <AppText style={{ color: '#fff', fontWeight: 'bold' }}>Save Expense</AppText>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </Animated.View>

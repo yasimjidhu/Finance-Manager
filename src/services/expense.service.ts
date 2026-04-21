@@ -1,4 +1,5 @@
-import { StorageService } from './storage.service';
+import { supabase } from '../lib/supabase';
+import { TransactionSchema } from '../utils/validation';
 
 export interface Transaction {
     id: string;
@@ -9,50 +10,111 @@ export interface Transaction {
     category: string;
     icon?: string;
     color?: string;
+    user_id?: string;
 }
-
-const TRANSACTIONS_KEY = 'transactions_data';
-
-const DUMMY_TRANSACTIONS: Transaction[] = [
-    { id: '1', title: 'Salary Credited', amount: 85000, date: new Date().toISOString(), type: 'income', category: 'Salary', icon: 'cash-multiple', color: '#10B981' },
-    { id: '2', title: 'Netflix Subscription', amount: 799, date: new Date().toISOString(), type: 'expense', category: 'Entertainment', icon: 'movie-open', color: '#E50914' },
-    { id: '3', title: 'Grocery Shopping', amount: 2450, date: new Date(Date.now() - 86400000).toISOString(), type: 'expense', category: 'Food', icon: 'cart', color: '#F59E0B' },
-];
 
 export const ExpenseService = {
     getAllTransactions: async (): Promise<Transaction[]> => {
-        const data = await StorageService.getData(TRANSACTIONS_KEY);
-        if (!data) {
-            await StorageService.storeData(TRANSACTIONS_KEY, DUMMY_TRANSACTIONS);
-            return DUMMY_TRANSACTIONS;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
+
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching transactions:', error);
+            throw error;
         }
-        return data;
     },
 
-    addTransaction: async (transaction: Omit<Transaction, 'id'>): Promise<Transaction[]> => {
-        const currentData = await ExpenseService.getAllTransactions();
-        const newTransaction = {
-            ...transaction,
-            id: Date.now().toString(),
-        };
-        const updatedData = [newTransaction, ...currentData];
-        await StorageService.storeData(TRANSACTIONS_KEY, updatedData);
-        return updatedData;
+    addTransaction: async (transaction: Omit<Transaction, 'id'>): Promise<Transaction | null> => {
+        try {
+            // Validate input
+            const validationResult = TransactionSchema.safeParse(transaction);
+            if (!validationResult.success) {
+                console.error('Validation Error:', validationResult.error.issues);
+                throw new Error(validationResult.error.issues[0].message);
+            }
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated');
+
+            const { data, error } = await supabase
+                .from('transactions')
+                .insert([{
+                    ...transaction,
+                    user_id: user.id,
+                    date: transaction.date || new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error adding transaction:', error);
+            throw error;
+        }
     },
 
     getBalance: async (): Promise<{ income: number; expense: number; total: number }> => {
-        const transactions = await ExpenseService.getAllTransactions();
-        const income = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
-        const expense = transactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
+        try {
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('amount, type');
 
-        return {
-            income,
-            expense,
-            total: income - expense
-        };
+            if (error) throw error;
+
+            const income = data
+                ?.filter((t: any) => t.type === 'income')
+                .reduce((sum: number, t: any) => sum + Number(t.amount), 0) || 0;
+
+            const expense = data
+                ?.filter((t: any) => t.type === 'expense')
+                .reduce((sum: number, t: any) => sum + Number(t.amount), 0) || 0;
+
+            return {
+                income,
+                expense,
+                total: income - expense
+            };
+        } catch (error) {
+            console.error('Error calculating balance:', error);
+            return { income: 0, expense: 0, total: 0 };
+        }
+    },
+
+    updateTransaction: async (id: string, updates: Partial<Transaction>): Promise<void> => {
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .update(updates)
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating transaction:', error);
+            throw error;
+        }
+    },
+
+    deleteTransaction: async (id: string): Promise<void> => {
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting transaction:', error);
+            throw error;
+        }
     }
 };

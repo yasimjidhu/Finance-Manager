@@ -3,7 +3,8 @@ import { lightTheme, darkTheme, AppTheme } from "./index";
 
 const ThemeContext = createContext({
   theme: lightTheme as AppTheme,
-  toggleTheme: () => {},
+  toggleTheme: () => { },
+  isDark: false,
 });
 
 export const useTheme = () => useContext(ThemeContext);
@@ -18,6 +19,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         theme: isDark ? darkTheme : lightTheme,
         toggleTheme,
+        isDark,
       }}
     >
       {children}

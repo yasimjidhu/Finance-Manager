@@ -26,5 +26,13 @@ export const StorageService = {
         } catch (e) {
             console.error('Error removing data', e);
         }
+    },
+
+    clearAll: async () => {
+        try {
+            await AsyncStorage.clear();
+        } catch (e) {
+            console.error('Error clearing all data', e);
+        }
     }
 };
