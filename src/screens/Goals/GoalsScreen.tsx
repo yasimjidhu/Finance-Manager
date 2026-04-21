@@ -15,7 +15,7 @@ const DUMMY_GOALS = [
         targetAmount: 150000,
         savedAmount: 45000,
         monthlySavings: 11667,
-        image: require('../../../assets/bali.png'),
+        image: require('../../../assets/bali.jpg'),
     },
     {
         id: '2',
@@ -23,7 +23,7 @@ const DUMMY_GOALS = [
         targetAmount: 120000,
         savedAmount: 80000,
         monthlySavings: 8000,
-        image: require('../../../assets/iphone.png'),
+        image: require('../../../assets/iphone.jpg'),
     },
 ];
 
