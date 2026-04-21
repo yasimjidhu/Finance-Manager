@@ -14,7 +14,7 @@ const SLIDES = [
         id: '1',
         title: 'Welcome to Finance Tracker!',
         description: 'Your intelligent companion for mastering personal finance. Take control of your money, track expenses, and reach your savings goals with ease.',
-        image: require('../../../assets/onboarding.png'),
+        image: require('../../../assets/onboarding.jpg'),
     },
     {
         id: '2',
