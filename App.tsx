@@ -12,6 +12,7 @@ import {
   Poppins_700Bold
 } from "@expo-google-fonts/poppins";
 import { ThemeProvider } from "./src/theme/ThemeProvider";
+import { AlertProvider } from "./src/context/AlertContext";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -25,7 +26,9 @@ export default function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
-        <AppNavigator />
+        <AlertProvider>
+          <AppNavigator />
+        </AlertProvider>
       </ThemeProvider>
     </Provider>
   );

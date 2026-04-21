@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, Image, ViewStyle, ImageSourcePropType } from 'react-native';
+import { View, StyleSheet, Image, ViewStyle, ImageSourcePropType, TouchableOpacity } from 'react-native';
 import AppText from '../common/AppText';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/spacing';
 import { formatCurrency } from '../../utils/helpers';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface GoalCardProps {
     title: string;
@@ -12,6 +13,8 @@ interface GoalCardProps {
     monthlySavings: number;
     image?: ImageSourcePropType;
     style?: ViewStyle;
+    onPress?: () => void;
+    onLongPress?: () => void;
 }
 
 export default function GoalCard({
@@ -20,7 +23,9 @@ export default function GoalCard({
     savedAmount,
     monthlySavings,
     image,
-    style
+    style,
+    onPress,
+    onLongPress
 }: GoalCardProps) {
     const { theme } = useTheme();
 
@@ -28,31 +33,35 @@ export default function GoalCard({
     const percentage = Math.round(progress * 100);
 
     return (
-        <View style={[styles.card, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }, style]}>
+        <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={[styles.card, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }, style]}
+        >
             <View style={styles.header}>
                 {image ? (
                     <Image source={image} style={styles.image} />
                 ) : (
-                    <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.surface }]} />
+                    <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.surface }]}>
+                        <Ionicons name="trophy-outline" size={24} color={theme.colors.primary} />
+                    </View>
                 )}
                 <View style={styles.headerText}>
                     <AppText style={[styles.title, { color: theme.colors.text }]}>{title}</AppText>
-                    <AppText style={[styles.target, { color: theme.colors.textMuted }]}>
-                        Target: {formatCurrency(targetAmount)}
-                    </AppText>
+                    <View style={styles.targetRow}>
+                        <Ionicons name="flag-outline" size={12} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
+                        <AppText style={[styles.target, { color: theme.colors.textMuted }]}>
+                            Target: {formatCurrency(targetAmount)}
+                        </AppText>
+                    </View>
+                </View>
+                <View style={[styles.percentageBadge, { backgroundColor: 'rgba(252, 163, 17, 0.1)' }]}>
+                    <AppText style={[styles.percentageText, { color: theme.colors.primary }]}>{percentage}%</AppText>
                 </View>
             </View>
 
             <View style={styles.progressSection}>
-                <View style={styles.progressLabels}>
-                    <AppText style={[styles.savedAmount, { color: theme.colors.text }]}>
-                        Saved: {formatCurrency(savedAmount)}
-                    </AppText>
-                    <AppText style={[styles.percentage, { color: theme.colors.primary }]}>
-                        {percentage}%
-                    </AppText>
-                </View>
-
                 <View style={[styles.progressBarBg, { backgroundColor: theme.colors.surface }]}>
                     <View
                         style={[
@@ -64,11 +73,22 @@ export default function GoalCard({
                         ]}
                     />
                 </View>
+                <View style={styles.progressLabels}>
+                    <AppText style={[styles.savedAmount, { color: theme.colors.text }]}>
+                        {formatCurrency(savedAmount)} <AppText style={{ color: theme.colors.textMuted, fontSize: 12 }}>Saved</AppText>
+                    </AppText>
+                    <AppText style={[styles.remainingAmount, { color: theme.colors.textMuted }]}>
+                        {formatCurrency(targetAmount - savedAmount)} Left
+                    </AppText>
+                </View>
             </View>
 
-            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+            <View style={[styles.divider, { backgroundColor: 'rgba(0,0,0,0.05)' }]} />
 
             <View style={styles.footer}>
+                <View style={styles.footerIconBox}>
+                    <Ionicons name="trending-up" size={14} color={theme.colors.success} />
+                </View>
                 <AppText style={[styles.footerLabel, { color: theme.colors.textMuted }]}>
                     Monthly Savings Needed:
                 </AppText>
@@ -76,21 +96,18 @@ export default function GoalCard({
                     {formatCurrency(monthlySavings)}
                 </AppText>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: spacing.md,
+        borderRadius: spacing.lg,
         padding: spacing.md,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowRadius: 8,
+        elevation: 3,
     },
     header: {
         flexDirection: 'row',
@@ -98,27 +115,42 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     image: {
-        width: 48,
-        height: 48,
-        borderRadius: 8,
+        width: 56,
+        height: 56,
+        borderRadius: 12,
         marginRight: spacing.md,
     },
     imagePlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 8,
+        width: 56,
+        height: 56,
+        borderRadius: 12,
         marginRight: spacing.md,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerText: {
         flex: 1,
     },
     title: {
         fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 2,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    targetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     target: {
-        fontSize: 14,
+        fontSize: 12,
+    },
+    percentageBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    percentageText: {
+        fontSize: 12,
+        fontWeight: 'bold',
     },
     progressSection: {
         marginBottom: spacing.md,
@@ -126,15 +158,14 @@ const styles = StyleSheet.create({
     progressLabels: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: spacing.xs,
+        marginTop: spacing.xs,
     },
     savedAmount: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: 'bold',
     },
-    percentage: {
-        fontSize: 14,
-        fontWeight: '600',
+    remainingAmount: {
+        fontSize: 12,
     },
     progressBarBg: {
         height: 8,
@@ -148,18 +179,27 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         marginBottom: spacing.md,
-        opacity: 0.5,
     },
     footer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
     },
+    footerIconBox: {
+        width: 24,
+        height: 24,
+        borderRadius: 8,
+        backgroundColor: 'rgba(34, 197, 94, 0.1)', // Green opacity
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+    },
     footerLabel: {
-        fontSize: 14,
+        fontSize: 12,
+        flex: 1,
     },
     footerValue: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: 'bold',
     },
 });
+

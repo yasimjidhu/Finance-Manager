@@ -30,22 +30,36 @@ export default function FestivalCard({
     const percentage = Math.round((spent / budget) * 100);
 
     // Status badge colors
-    const statusColor = isOverBudget ? theme.colors.danger : '#636AE8'; // Using the indigo/purple for under budget
-    const statusBg = isOverBudget ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 106, 232, 0.1)';
+    const statusColor = isOverBudget ? theme.colors.danger : theme.colors.success;
+    const statusBg = isOverBudget ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)';
     const statusText = isOverBudget ? 'Over Budget' : 'Under Budget';
 
     return (
-        <View style={[styles.card, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }, style]}>
+        <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={onPress}
+            style={[styles.card, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }, style]}
+        >
             {/* Image Header */}
             <View style={styles.imageContainer}>
                 {image ? (
                     <ImageBackground source={image} style={styles.image} resizeMode="cover">
                         <View style={styles.overlay} />
-                        <AppText style={styles.festivalName}>{name}</AppText>
+                        <View style={styles.headerContent}>
+                            <AppText style={styles.festivalName}>{name}</AppText>
+                            <View style={[styles.badge, { backgroundColor: statusBg }]}>
+                                <AppText style={[styles.badgeText, { color: statusColor }]}>{statusText}</AppText>
+                            </View>
+                        </View>
                     </ImageBackground>
                 ) : (
                     <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.primary }]}>
-                        <AppText style={styles.festivalName}>{name}</AppText>
+                        <View style={styles.headerContent}>
+                            <AppText style={styles.festivalName}>{name}</AppText>
+                            <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                <AppText style={[styles.badgeText, { color: '#fff' }]}>{statusText}</AppText>
+                            </View>
+                        </View>
                     </View>
                 )}
             </View>
@@ -53,14 +67,16 @@ export default function FestivalCard({
             {/* Content */}
             <View style={styles.content}>
                 <View style={styles.row}>
-                    <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Budget</AppText>
-                    <AppText style={[styles.value, { color: theme.colors.text }]}>{formatCurrency(budget)}</AppText>
-                </View>
-                <View style={styles.row}>
-                    <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Actual Spending</AppText>
-                    <AppText style={[styles.value, { color: isOverBudget ? theme.colors.danger : '#636AE8' }]}>
-                        {formatCurrency(spent)}
-                    </AppText>
+                    <View>
+                        <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Budget</AppText>
+                        <AppText style={[styles.value, { color: theme.colors.text }]}>{formatCurrency(budget)}</AppText>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <AppText style={[styles.label, { color: theme.colors.textMuted }]}>Spent</AppText>
+                        <AppText style={[styles.value, { color: isOverBudget ? theme.colors.danger : theme.colors.success }]}>
+                            {formatCurrency(spent)}
+                        </AppText>
+                    </View>
                 </View>
 
                 {/* Progress Bar */}
@@ -69,69 +85,68 @@ export default function FestivalCard({
                         style={[
                             styles.progressBarFill,
                             {
-                                width: `${percentage}%`,
-                                backgroundColor: isOverBudget ? theme.colors.danger : '#636AE8'
+                                width: `${Math.min(percentage, 100)}%`,
+                                backgroundColor: isOverBudget ? theme.colors.danger : theme.colors.primary
                             }
                         ]}
                     />
                 </View>
 
-                {/* Status Badge */}
-                <View style={styles.badgeContainer}>
-                    <View style={[styles.badge, { backgroundColor: statusBg }]}>
-                        <AppText style={[styles.badgeText, { color: statusColor }]}>{statusText}</AppText>
-                    </View>
+                <View style={styles.footer}>
+                    <AppText style={[styles.percentageText, { color: theme.colors.textMuted }]}>
+                        {percentage}% Used
+                    </AppText>
+                    <TouchableOpacity style={styles.detailsButton} onPress={onPress}>
+                        <AppText style={[styles.detailsText, { color: theme.colors.primary }]}>Details</AppText>
+                        <Ionicons name="chevron-forward" size={14} color={theme.colors.primary} />
+                    </TouchableOpacity>
                 </View>
-
-                {/* View Details Button */}
-                <TouchableOpacity style={[styles.detailsButton, { borderColor: theme.colors.border }]} onPress={onPress}>
-                    <AppText style={[styles.detailsText, { color: '#636AE8' }]}>View Details</AppText>
-                    <Ionicons name="chevron-forward" size={16} color="#636AE8" />
-                </TouchableOpacity>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: spacing.md,
+        borderRadius: 20,
         marginBottom: spacing.lg,
-        borderWidth: 1,
         overflow: 'hidden',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
     },
     imageContainer: {
-        height: 120,
+        height: 140,
         width: '100%',
     },
     image: {
         width: '100%',
         height: '100%',
         justifyContent: 'flex-end',
-        padding: spacing.md,
     },
     imagePlaceholder: {
         width: '100%',
         height: '100%',
         justifyContent: 'flex-end',
-        padding: spacing.md,
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.3)',
     },
+    headerContent: {
+        padding: spacing.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+    },
     festivalName: {
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
     content: {
         padding: spacing.md,
@@ -139,19 +154,19 @@ const styles = StyleSheet.create({
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: spacing.xs,
+        marginBottom: spacing.md,
     },
     label: {
-        fontSize: 14,
+        fontSize: 12,
+        marginBottom: 4,
     },
     value: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 18,
+        fontWeight: '700',
     },
     progressBarBg: {
         height: 6,
         borderRadius: 3,
-        marginTop: spacing.sm,
         marginBottom: spacing.md,
         overflow: 'hidden',
     },
@@ -159,31 +174,32 @@ const styles = StyleSheet.create({
         height: '100%',
         borderRadius: 3,
     },
-    badgeContainer: {
-        flexDirection: 'row',
-        marginBottom: spacing.md,
-    },
     badge: {
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: spacing.sm,
+        borderRadius: 12,
     },
     badgeText: {
         fontSize: 12,
         fontWeight: '600',
     },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    percentageText: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
     detailsButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.sm,
-        borderWidth: 1,
-        borderRadius: spacing.sm,
-        marginTop: spacing.xs,
+        paddingVertical: 4,
     },
     detailsText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 13,
+        fontWeight: '600',
         marginRight: 4,
     },
 });

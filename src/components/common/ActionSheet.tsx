@@ -22,6 +22,8 @@ interface ActionSheetProps {
     onAction?: () => void;
     secondaryActionLabel?: string;
     onSecondaryAction?: () => void;
+    secondaryActionDestructive?: boolean;
+    actionDisabled?: boolean;
 }
 
 const { height } = Dimensions.get('window');
@@ -35,6 +37,8 @@ const ActionSheet = ({
     onAction,
     secondaryActionLabel,
     onSecondaryAction,
+    secondaryActionDestructive,
+    actionDisabled,
 }: ActionSheetProps) => {
     const { theme } = useTheme();
 
@@ -81,18 +85,34 @@ const ActionSheet = ({
                                 <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
                                     {secondaryActionLabel && (
                                         <TouchableOpacity
-                                            style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
+                                            style={[
+                                                styles.secondaryButton,
+                                                {
+                                                    borderColor: secondaryActionDestructive ? theme.colors.danger : theme.colors.border,
+                                                    backgroundColor: secondaryActionDestructive ? (theme.colors.danger + '10') : 'transparent'
+                                                }
+                                            ]}
                                             onPress={onSecondaryAction}
                                         >
-                                            <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                                            <Text style={[
+                                                styles.secondaryButtonText,
+                                                { color: secondaryActionDestructive ? theme.colors.danger : theme.colors.text }
+                                            ]}>
                                                 {secondaryActionLabel}
                                             </Text>
                                         </TouchableOpacity>
                                     )}
                                     {actionLabel && (
                                         <TouchableOpacity
-                                            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                                            onPress={onAction}
+                                            style={[
+                                                styles.primaryButton,
+                                                {
+                                                    backgroundColor: actionDisabled ? theme.colors.border : theme.colors.primary,
+                                                    opacity: actionDisabled ? 0.5 : 1
+                                                }
+                                            ]}
+                                            onPress={actionDisabled ? undefined : onAction}
+                                            disabled={actionDisabled}
                                         >
                                             <Text style={styles.primaryButtonText}>{actionLabel}</Text>
                                         </TouchableOpacity>
